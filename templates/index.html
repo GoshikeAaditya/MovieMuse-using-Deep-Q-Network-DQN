@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieMuse</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .movie-card {
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .rating {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .genre-badge {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">MovieMuse</a>
+        </div>
+        <!-- Add this to your navbar -->
+        <div class="ms-auto">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                <label class="form-check-label text-light" for="darkModeToggle">Dark Mode</label>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Search Movies</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="searchQuery" class="form-label">Search Query</label>
+                            <input type="text" class="form-control" id="searchQuery" placeholder="Enter movie title or genre">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Search Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="searchType" id="searchTitle" value="title" checked>
+                                <label class="form-check-label" for="searchTitle">
+                                    Title
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="searchType" id="searchGenre" value="genre">
+                                <label class="form-check-label" for="searchGenre">
+                                    Genre
+                                </label>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="searchBtn">Search</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Search Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="searchResults" class="row">
+                            <div class="col-12 text-center">
+                                <p>Enter a search query to find movies</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4" id="similarSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Similar Movies</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="similarMovies" class="row">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Search for movies
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const searchType = document.querySelector('input[name="searchType"]:checked').value;
+            
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('searchResults').innerHTML = '<div class="col-12 text-center"><p>Searching...</p></div>';
+            document.getElementById('similarSection').style.display = 'none';
+            
+            // Log the search request to console for debugging
+            console.log('Searching for:', query, 'Type:', searchType);
+            
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: query,
+                    type: searchType
+                })
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Search results:', data);
+                
+                const searchResultsDiv = document.getElementById('searchResults');
+                searchResultsDiv.innerHTML = '';
+                
+                if (!data || data.error) {
+                    searchResultsDiv.innerHTML = `<div class="col-12 text-center"><p>Error: ${data.error || 'Unknown error'}</p></div>`;
+                    return;
+                }
+                
+                if (data.length === 0) {
+                    searchResultsDiv.innerHTML = '<div class="col-12 text-center"><p>No movies found</p></div>';
+                    return;
+                }
+                
+                data.forEach(movie => {
+                    const movieCard = document.createElement('div');
+                    movieCard.className = 'col-md-6 movie-card';
+                    
+                    let genreBadges = '';
+                    if (movie.genres) {
+                        genreBadges = movie.genres.map(genre => 
+                            `<span class="badge bg-secondary genre-badge">${genre}</span>`
+                        ).join('');
+                    }
+                    
+                    movieCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${movie.title}</h5>
+                                <p class="card-text">
+                                    <span class="rating">★ ${movie.average_rating.toFixed(1)}</span> 
+                                    (${movie.rating_count} ratings)
+                                </p>
+                                <div class="mb-2">${genreBadges}</div>
+                                <p class="card-text text-muted">Movie ID: ${movie.id}</p>
+                                <button class="btn btn-sm btn-outline-primary find-similar" data-movie-id="${movie.id}">Find Similar Movies</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    searchResultsDiv.appendChild(movieCard);
+                });
+                
+                // Add event listeners to "Find Similar Movies" buttons
+                document.querySelectorAll('.find-similar').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const movieId = parseInt(this.getAttribute('data-movie-id'));
+                        findSimilarMovies(movieId);
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Error searching movies:', error);
+                document.getElementById('searchResults').innerHTML = `<div class="col-12 text-center"><p>Error: ${error.message}</p></div>`;
+            });
+        });
+        
+        // Find similar movies
+        function findSimilarMovies(movieId) {
+            // Show loading state
+            document.getElementById('similarSection').style.display = 'block';
+            document.getElementById('similarMovies').innerHTML = '<div class="col-12 text-center"><p>Finding similar movies...</p></div>';
+            
+            fetch('/recommend-similar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    movie_id: movieId,
+                    top_k: 10
+                })
+            })
+            .then(response => response.json())
+            .then(movies => {
+                const similarMoviesDiv = document.getElementById('similarMovies');
+                similarMoviesDiv.innerHTML = '';
+                
+                if (movies.length === 0) {
+                    similarMoviesDiv.innerHTML = '<div class="col-12 text-center"><p>No similar movies found</p></div>';
+                    return;
+                }
+                
+                movies.forEach(movie => {
+                    const movieCard = document.createElement('div');
+                    movieCard.className = 'col-md-4 movie-card';
+                    
+                    let genreBadges = '';
+                    if (movie.genres) {
+                        genreBadges = movie.genres.map(genre => 
+                            `<span class="badge bg-secondary genre-badge">${genre}</span>`
+                        ).join('');
+                    }
+                    
+                    movieCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${movie.title}</h5>
+                                <p class="card-text">
+                                    <span class="rating">★ ${movie.average_rating.toFixed(1)}</span> 
+                                    (${movie.rating_count} ratings)
+                                </p>
+                                <div class="mb-2">${genreBadges}</div>
+                                <p class="card-text">
+                                    <span class="badge bg-info">Similarity: ${(movie.similarity * 100).toFixed(0)}%</span>
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    similarMoviesDiv.appendChild(movieCard);
+                });
+            })
+            .catch(error => console.error('Error finding similar movies:', error));
+        }
+    </script>
+    <!-- Add this to your JavaScript -->
+    <script>
+        // Dark mode toggle
+        document.getElementById('darkModeToggle').addEventListener('change', function() {
+            document.body.classList.toggle('dark-mode', this.checked);
+            localStorage.setItem('darkMode', this.checked);
+        });
+        
+        // Check for saved preference
+        document.addEventListener('DOMContentLoaded', function() {
+            const darkMode = localStorage.getItem('darkMode') === 'true';
+            document.getElementById('darkModeToggle').checked = darkMode;
+            document.body.classList.toggle('dark-mode', darkMode);
+        });
+    </script>
+    
+    <!-- Add this to your CSS -->
+    <style>
+        .dark-mode {
+            background-color: #222;
+            color: #f8f9fa;
+        }
+        
+        .dark-mode .card {
+            background-color: #333;
+            color: #f8f9fa;
+        }
+        
+        .dark-mode .card-header {
+            background-color: #444;
+        }
+    </style>
+</body>
+</html>
